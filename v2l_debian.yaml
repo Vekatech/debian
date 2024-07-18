@@ -1,0 +1,131 @@
+{{- $stage    := or .stage    "full" -}}
+{{- $arch     := or .arch     "arm64" -}}
+{{- $suite    := or .suite    "bookworm" -}}
+{{- $board    := or .board    "vkrzv2l" -}}
+{{- $locale   := or .locale   "en_US" -}}
+{{- $user     := or .user     "vkrz" -}}
+{{- $pass     := or .pass     "vkrzv2l" -}}
+{{- $hostname := or .hostname (printf "%s" $board) -}}
+{{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
+{{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
+
+architecture: {{ $arch }}
+
+actions:
+{{if or (eq $stage "common") (eq $stage "full")}}
+  - action: debootstrap
+    description: create basic Debian filesystem
+    suite: {{ $suite }}
+    components:
+      - main
+    mirror: http://cdn.debian.net/debian/
+    variant: minbase
+
+  - action: apt
+    description: add extra packages
+    packages: [
+        kmod, sudo, adduser, systemd-sysv, udev, dnsutils, ifupdown, iproute2,
+        iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
+        lsb-release, locales, dialog, file, usbutils, nano, less, tree,
+        vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
+        fdisk, network-manager, dosfstools, alsaplayer-common, alsa-utils,
+        v4l-utils, task-lxde-desktop, epiphany-browser, ca-certificates,
+        apt-utils, systemd-timesyncd
+    ]
+
+  - action: run
+    description: cleanup packages after install
+    chroot: true
+    command: apt clean
+
+  - action: run
+    description: set default locale
+    chroot: true
+    script: scripts/setup-locale.sh {{ $locale }}
+
+  - action: run
+    description: add a new user (will be in sudoers)
+    chroot: true
+    script: scripts/setup-user.sh {{ $user }} "{{ $pass }}"
+
+  - action: run
+    description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
+    chroot: true
+    command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
+
+  - action: overlay
+    description: command for extending rootfs partition
+    source: overlays/growfs
+
+  - action: overlay
+    description: command for fixing serial console terminal size
+    source: overlays/fixterm
+
+{{if eq $stage "common"}}
+  - action: pack
+    file: {{ $pack }}
+    compression: gz
+{{end}}
+{{end}}
+
+{{if or (eq $stage "board") (eq $stage "full")}}
+{{if eq $stage "board"}}
+  - action: unpack
+    file: {{ $pack }}
+    compression: gz
+{{end}}
+
+  - action: run
+    description: set hostname
+    chroot: true
+    command: echo {{ $hostname }} > /etc/hostname
+
+  - action: run
+    description: set hosts file
+    chroot: true
+    script: scripts/setup-hosts.sh {{ $hostname }}
+
+  - action: overlay
+    description: add board specific files
+    source: overlays/boards/{{ $board }}
+
+  - action: run
+    description: NM connections must be readable by root only
+    chroot: true
+    command: find /etc/NetworkManager/system-connections/ -type f -exec chmod 600 {} \+
+
+  - action: image-partition
+    description: create a partitioned image
+    imagename: {{ $image }}
+    imagesize: 2GB
+    partitiontype: msdos
+    mountpoints:
+      - mountpoint: /
+        partition: rootfs
+        options: [ noatime ]
+      - mountpoint: /boot
+        partition: boot
+    partitions:
+      - name: boot
+        fs: fat32
+        start: 0%
+        end: 100MB
+        flags: [ boot ]
+      - name: rootfs
+        fs: ext4
+        start: 100MB
+        end: 100%
+
+  - action: filesystem-deploy
+    description: deploying filesystem onto image
+
+  - action: run
+    description: obtain a bitmap file for faster flashing
+    postprocess: true
+    command: bmaptool create {{ $image }} -o {{ $image }}.bmap
+
+  - action: run
+    description: compress the image
+    postprocess: true
+    command: xz -T0 -f {{ $image }}
+{{end}}
