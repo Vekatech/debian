@@ -1,13 +1,14 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
 {{- $suite    := or .suite    "bookworm" -}}
-{{- $board    := or .board    "vkrzg2l" -}}
+{{- $board    := or .board    "vkcmg2lc" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
-{{- $pass     := or .pass     "vkrzg2l" -}}
+{{- $pass     := or .pass     "vkcmg2lc" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
 {{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
+{{- $sparse_image :=          (printf "debian-%s-%s.simg" $suite $board) -}}
 
 architecture: {{ $arch }}
 
@@ -28,9 +29,9 @@ actions:
         iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
-        fdisk, network-manager, dosfstools, alsaplayer-common, alsa-utils,
+        fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
         v4l-utils, task-lxde-desktop, epiphany-browser, ca-certificates,
-        apt-utils, systemd-timesyncd, device-tree-compiler
+        apt-utils, systemd-timesyncd
     ]
 
   - action: run
@@ -52,6 +53,11 @@ actions:
     description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
     chroot: true
     command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
+
+  - action: run
+    description: set auto login & disable screen powersave
+    chroot: true
+    script: scripts/setup-login.sh {{ $user }}
 
   - action: overlay
     description: command for extending rootfs partition
@@ -118,6 +124,11 @@ actions:
 
   - action: filesystem-deploy
     description: deploying filesystem onto image
+
+#  - action: run
+#    description: create sparse image
+#    postprocess: true
+#    command: img2simg {{ $image }} {{ $sparse_image }}
 
   - action: run
     description: obtain a bitmap file for faster flashing

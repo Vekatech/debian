@@ -12,7 +12,7 @@ if [ $# -ne 1 ]; then
     echo "Usage: $0 <RECIPE.yaml>"
     exit 1
 else
-    BRD=vkrz${1%%_*} 
+    BRD=${1%%_*} 
     echo -e "\nBuilding debian for ${G}${BRD}${E} board\n"
 fi
 
@@ -39,7 +39,7 @@ fi
 if [ -z "${KERNEL}" ]; then
     if [ -d "${YOCTO_PATH}/${BRD}" ]; then
         echo -e "  Looking in ${G}YOCTO${E} folder ..."
-        IMG=$(find "${YOCTO_PATH}/${BRD}" -type f -name "*-${BRD}.wic" -exec basename {} \;)
+        IMG=$(find "${YOCTO_PATH}/${BRD}" -type l -name "*-${BRD}.wic" -exec basename {} \;)
         case "${IMG}" in
             "core-image-minimal-${BRD}.wic" | "core-image-bsp-${BRD}.wic" | "core-image-weston-${BRD}.wic" | "core-image-qt-${BRD}.wic" )
                 echo -e "    Found ${G}${IMG}${E} ... $(realpath ${YOCTO_PATH}/${BRD})${GRAY}/${IMG}${E}"
@@ -86,6 +86,15 @@ if [ -z "${KERNEL}" ]; then
         ;;
         "vkrzg2l" | "vkrzv2l")
         KIT=VK-RZ_V2L_docs
+        ;;
+        "vkrzg2ul")
+        KIT=VK-RZ_G2UL_docs
+        ;;
+        "vkcmg2lc")
+        KIT=VK-CMG2LC_docs
+        ;;
+        "vk-d184280e")
+        KIT=VK-D184280E_docs
         ;;
         *)
             echo -e "  No Download link for ${R}${BRD}${E} board !"
@@ -145,34 +154,76 @@ else
         mkdir -p ${CACHE_PATH}/${BRD}/lib
         echo -e "  Extracting ${G}modules${E} ..."
         cp -a /mnt/lib/modules ${CACHE_PATH}/${BRD}/lib/
-        if [ "$1" = "g2lc_debian_wl.yaml" ]; then
+        if [ "$1" = "vkrzg2lc_debian_wl.yaml" ]; then
             echo -e "  Extracting ${G}mali${E} driver ..."
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/include
-            cp -a /mnt/usr/include/CL ${CACHE_PATH}/${BRD}/usr/local/include/
-            cp -a /mnt/usr/include/EGL ${CACHE_PATH}/${BRD}/usr/local/include/
-            cp -a /mnt/usr/include/KHR ${CACHE_PATH}/${BRD}/usr/local/include/
-            cp -a /mnt/usr/include/GLES ${CACHE_PATH}/${BRD}/usr/local/include/
-            cp -a /mnt/usr/include/GLES2 ${CACHE_PATH}/${BRD}/usr/local/include/
-            cp -a /mnt/usr/include/GLES3 ${CACHE_PATH}/${BRD}/usr/local/include/
+            if [ -d /mnt/usr/include/CL ]; then
+                cp -a /mnt/usr/include/CL ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
+            if [ -d /mnt/usr/include/EGL ]; then
+                cp -a /mnt/usr/include/EGL ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
+            if [ -d /mnt/usr/include/KHR ]; then
+                cp -a /mnt/usr/include/KHR ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
+            if [ -d /mnt/usr/include/GLES ]; then
+                cp -a /mnt/usr/include/GLES ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
+            if [ -d /mnt/usr/include/GLES2 ]; then
+                cp -a /mnt/usr/include/GLES2 ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
+            if [ -d /mnt/usr/include/GLES3 ]; then
+                cp -a /mnt/usr/include/GLES3 ${CACHE_PATH}/${BRD}/usr/local/include/
+            fi
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib
-            cp -a /mnt/usr/lib64/libEGL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
-            cp -a /mnt/usr/lib64/libgbm.so ${CACHE_PATH}/${BRD}/usr/local/lib/
-            cp -a /mnt/usr/lib64/libGLESv1_CM.so ${CACHE_PATH}/${BRD}/usr/local/lib/
-            cp -a /mnt/usr/lib64/libGLESv2.so ${CACHE_PATH}/${BRD}/usr/local/lib/
-            cp -a /mnt/usr/lib64/libOpenCL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
-            cp -a /mnt/usr/lib64/libwayland-egl.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            if [ -f /mnt/usr/lib64/libEGL.so ]; then
+                cp -a /mnt/usr/lib64/libEGL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
+            if [ -f /mnt/usr/lib64/libgbm.so ]; then
+                cp -a /mnt/usr/lib64/libgbm.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
+            if [ -f /mnt/usr/lib64/libGLESv1_CM.so ]; then
+                cp -a /mnt/usr/lib64/libGLESv1_CM.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
+            if [ -f /mnt/usr/lib64/libGLESv2.so ]; then
+                cp -a /mnt/usr/lib64/libGLESv2.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
+            if [ -f /mnt/usr/lib64/libOpenCL.so ]; then
+                cp -a /mnt/usr/lib64/libOpenCL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
+            if [ -f /mnt/usr/lib64/libwayland-egl.so ]; then
+                cp -a /mnt/usr/lib64/libwayland-egl.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+            fi
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/mali_fbdev
-            cp -a /mnt/usr/lib64/mali_fbdev/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_fbdev/
+            if [ -f /mnt/usr/lib64/mali_fbdev/libmali.so ]; then
+                cp -a /mnt/usr/lib64/mali_fbdev/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_fbdev/
+            fi
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/mali_wayland
-            cp -a /mnt/usr/lib64/mali_wayland/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_wayland/
+            if [ -f /mnt/usr/lib64/mali_wayland/libmali.so ]; then
+                cp -a /mnt/usr/lib64/mali_wayland/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_wayland/
+            fi
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig
-            cp -a /mnt/usr/lib64/pkgconfig/egl.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/gbm.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/glesv1.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/glesv1_cm.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/glesv2.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/OpenCL.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
-            cp -a /mnt/usr/lib64/pkgconfig/wayland-egl.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            if [ -f /mnt/usr/lib64/pkgconfig/egl.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/egl.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/gbm.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/gbm.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/glesv1.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/glesv1.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/glesv1_cm.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/glesv1_cm.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/glesv2.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/glesv2.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/OpenCL.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/OpenCL.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
+            if [ -f /mnt/usr/lib64/pkgconfig/wayland-egl.pc ]; then
+                cp -a /mnt/usr/lib64/pkgconfig/wayland-egl.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
+            fi
             echo -e "  Configuring ${G}weston${E} ..."
             mkdir -p ${CACHE_PATH}/${BRD}/etc/default
             echo 'OPTARGS="--idle-time=0"' > ${CACHE_PATH}/${BRD}/etc/default/weston
@@ -181,8 +232,7 @@ else
             sed -i '/weston-terminal$/,${/^\[launcher\]$/{N;N;N;d}}' ${CACHE_PATH}/${BRD}/etc/xdg/weston/weston.ini
             mkdir -p ${CACHE_PATH}/${BRD}/lib/systemd/system
             cp -a /mnt/lib/systemd/system/weston@.service ${CACHE_PATH}/${BRD}/lib/systemd/system/
-            sed -i 's|^ExecStart=.*$|TTYPath=/dev/tty1\nExecStartPre=/bin/sh -c '\''if [ ! -f /var/log/weston.log ]; then install -m 664 -o root -g %i /dev/null /var/log/weston.log; fi'\''\nExecStart=/usr/bin/weston $OPTARGS --log=/var/log/weston.log\n\n[Install]\nWantedBy=multi-user.target|' ${CACHE_PATH}/${BRD}/lib/systemd/system/weston@.service
-            #settt
+            sed -i 's|^ExecStart=.*$|TTYPath=/dev/tty1\nExecStartPre=/bin/sh -c '\''if [ ! -f /var/log/weston.log ]; then install -m 664 -o root -g %i /dev/null /var/log/weston.log; fi'\''\nExecStartPre=/bin/sh -c '\''if [ -f /usr/local/lib/force_mali.sh ]; then /usr/local/lib/force_mali.sh; fi'\''\nExecStart=/usr/bin/weston $OPTARGS --log=/var/log/weston.log\n\n[Install]\nWantedBy=multi-user.target|' ${CACHE_PATH}/${BRD}/lib/systemd/system/weston@.service
         fi
         sudo umount /mnt
         sudo losetup -d ${DEV}

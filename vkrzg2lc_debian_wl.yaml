@@ -1,13 +1,14 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
 {{- $suite    := or .suite    "bookworm" -}}
-{{- $board    := or .board    "vkrzv2l" -}}
+{{- $board    := or .board    "vkrzg2lc" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
-{{- $pass     := or .pass     "vkrzv2l" -}}
+{{- $pass     := or .pass     "vkrzg2lc" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
-{{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
+{{- $image    := or .image    (printf "debian-%s-%s-wl.img" $suite $board) -}}
+{{- $sparse_image :=          (printf "debian-%s-%s.simg" $suite $board) -}}
 
 architecture: {{ $arch }}
 
@@ -28,8 +29,8 @@ actions:
         iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
-        fdisk, network-manager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils, task-lxde-desktop, epiphany-browser, ca-certificates,
+        fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
+        v4l-utils, weston, glmark2-es2-wayland,
         apt-utils, systemd-timesyncd
     ]
 
@@ -89,6 +90,20 @@ actions:
     description: add board specific files
     source: overlays/boards/{{ $board }}
 
+  - action: overlay
+    description: add script for forcing and reverting graphic driver
+    source: overlays/swap_graphics
+
+  - action: run
+    description: set graphics to use Mali driver
+    chroot: true
+    script: scripts/setup-mali.sh
+    
+  - action: run
+    description: set weston to autostart on boot
+    chroot: true
+    script: scripts/setup-weston.sh {{ $user }}
+
   - action: run
     description: NM connections must be readable by root only
     chroot: true
@@ -118,6 +133,11 @@ actions:
 
   - action: filesystem-deploy
     description: deploying filesystem onto image
+
+#  - action: run
+#    description: create sparse image
+#    postprocess: true
+#    command: img2simg {{ $image }} {{ $sparse_image }}
 
   - action: run
     description: obtain a bitmap file for faster flashing
