@@ -1,28 +1,42 @@
 #!/bin/bash
+
 R='\033[0;31m'
 G='\033[0;32m'
 Y='\033[0;33m'
 #B='\033[0;34m'
+M='\033[0;35m'
 GRAY='\033[0;90m'
 E='\033[0m'
-
-BLACK_BG='\033[0;40m'
 
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <RECIPE.yaml>"
     exit 1
 else
     BRD=${1%%_*} 
-    echo -e "\nBuilding debian for ${G}${BRD}${E} board\n"
+    echo -e "\nBuilding ${M}Debian${E} for ${G}${BRD}${E} board\n"
 fi
+
+case "${BRD}" in
+    "vkrzv2l")
+        FML="v2l"
+    ;;
+    "vkrzg2l" | "vkrzg2lc" | "vkrzg2ul" | "vkcmg2lc" | "vk-d184280e")
+        FML="g2l"
+    ;;
+    *)
+        echo -e "Unsupported <${R}BOARD${E}>_debian.yaml: ${R}$1${E}"
+        echo -e "Available BOARDs are: ${G}vkrzv2l${E} | ${G}vkrzg2l${E} | ${G}vkrzg2lc${E} | ${G}vkrzg2ul${E} | ${G}vkcmg2lc${E} | ${G}vk-d184280e${E}"
+        exit 1 
+    ;;
+esac
 
 KERNEL_PATH=$(dirname $(realpath $0))/kernel
 CACHE_PATH=$(dirname $(realpath $0))/overlays/boards
-YOCTO_PATH=$(dirname $(realpath $0))/../${BRD}/vlp_305/yocto/yocto_305/build/tmp/deploy/images
+YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
 
 KERNEL=
 
-echo "Checking for kernel img ..."
+echo -e "Checking for ${Y}kernel${E} img ..."
 if [ -d ${CACHE_PATH}/${BRD} ]; then
     echo -e "  Looking in ${G}CACHE${E} folder ... "
     IMG="Image"
@@ -239,32 +253,30 @@ else
     fi
 
     if ! command -v docker &> /dev/null; then
-        echo -e "Checking for Docker ... ${R}NO${E} ${GRAY}[MISSING]${E}"
-        read -p "  Do you want to install it? (Y/n) " answer
-        if [ "$answer" = "Y" ] || [ "$answer" = "y" ]; then
-            sudo apt-get update
-            sudo apt-get install ca-certificates curl
-            sudo install -m 0755 -d /etc/apt/keyrings
-            sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-            sudo chmod a+r /etc/apt/keyrings/docker.asc
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-            sudo usermod -aG docker ${USER}
-            echo "  Relogging ... to refresh the groups"
-            su - ${USER}
-            if docker run hello-world | grep "^Hello from Docker!$"; then
-                echo -e "  Nice! Now you have ${G}Docker${E}"
-            else
-                echo -e "  Please reinstall Docker manually & investigate why hello-world ${R}does't${E} work! For more info check this: ${G}https://github.com/renesas-rz/docker_setup${E}"
-                exit 1
-            fi
+        echo -e "Checking for ${Y}docker${E} ... ${R}NO${E} ${GRAY}[MISSING]${E}"
+        echo -e "  Installing ${M}docker${E} ..."
+        echo -e "  ${Y}-------------------${E}"
+        sudo apt-get update
+        sudo apt-get install ca-certificates -y
+        sudo install -m 0755 -d /etc/apt/keyrings
+        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        sudo chmod a+r /etc/apt/keyrings/docker.asc
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+        echo -e "  ${Y}-------------------${E}"
+        sudo usermod -aG docker ${USER}
+        echo "  Trying docker ..."
+        if su - "${USER}" -c 'docker run hello-world | grep "^Hello from Docker!$"'; then
+            echo -e "  Nice! Now you have ${G}docker${E}"
+            echo -e "  Please log out (typing ${R}exit${E}) & log in, after that, run the ${G}${0}${E} script again, so the group changes to take effect."
+            exit 0
         else
-            echo -e "  OK install it yourself, but make sure it's setupped this way: ${G}https://github.com/renesas-rz/docker_setup${E}"
+            echo -e "  Something got wrong! Please install ${R}docker${E} manually & investigate why hello-world ${R}doesn't${E} work!"
             exit 1
-        fi
+    fi
     else
-        echo -e "Checking for Docker ... ${G}YES${E} ${GRAY}[INSTALLED]${E}"
+        echo -e "Checking for ${Y}docker${E} ... ${G}YES${E} ${GRAY}[INSTALLED]${E}"
     fi
 
     echo -e "\nBuilding ...\n"
