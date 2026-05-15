@@ -1,14 +1,14 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
 {{- $suite    := or .suite    "trixie" -}}
-{{- $board    := or .board    "vkrzg2ul" -}}
+{{- $board    := or .board    "vkrzg2lc" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
-{{- $pass     := or .pass     "vkrzg2ul" -}}
+{{- $pass     := or .pass     "vkrzg2lc" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
-{{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
-{{- $sparse_image :=          (printf "debian-%s-%s.simg" $suite $board) -}}
+{{- $image    := or .image    (printf "debian-%s-%s-pf.img" $suite $board) -}}
+{{- $sparse_image :=          (printf "debian-%s-%s-pf.simg" $suite $board) -}}
 
 architecture: {{ $arch }}
 
@@ -30,7 +30,7 @@ actions:
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
         fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils,
+        v4l-utils, task-lxde-desktop, ca-certificates,
         apt-utils, systemd-timesyncd
     ]
 
@@ -50,9 +50,19 @@ actions:
     script: scripts/setup-user.sh {{ $user }} "{{ $pass }}"
 
   - action: run
-    description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
+    description: add a user to group video, audio, dialout, tty, disk, kmem, kvm, render
     chroot: true
-    command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
+    command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm,render {{ $user }}
+
+  - action: run
+    description: setup Renderer
+    chroot: true
+    command: echo 'PAN_MESA_DEBUG="noafbc"' > /etc/environment
+
+  - action: run
+    description: set auto login & disable screen powersave
+    chroot: true
+    script: scripts/setup-login.sh {{ $user }}
 
   - action: overlay
     description: command for extending rootfs partition

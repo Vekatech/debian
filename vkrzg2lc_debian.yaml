@@ -1,6 +1,6 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
-{{- $suite    := or .suite    "bookworm" -}}
+{{- $suite    := or .suite    "trixie" -}}
 {{- $board    := or .board    "vkrzg2lc" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
@@ -30,7 +30,7 @@ actions:
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
         fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils, task-lxde-desktop, epiphany-browser, ca-certificates,
+        v4l-utils, task-lxde-desktop, chromium, ca-certificates,
         apt-utils, systemd-timesyncd
     ]
 
@@ -138,5 +138,5 @@ actions:
   - action: run
     description: compress the image
     postprocess: true
-    command: xz -T0 -f {{ $image }}
+    command: xz -T0 -f -k {{ $image }}
 {{end}}

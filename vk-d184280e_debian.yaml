@@ -1,6 +1,6 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
-{{- $suite    := or .suite    "bookworm" -}}
+{{- $suite    := or .suite    "trixie" -}}
 {{- $board    := or .board    "vk-d184280e" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
@@ -25,13 +25,13 @@ actions:
   - action: apt
     description: add extra packages
     packages: [
-        kmod, sudo, adduser, systemd-sysv, udev, dnsutils, ifupdown, iproute2,
-        iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
-        lsb-release, locales, dialog, file, usbutils, nano, less, tree,
-        vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
-        fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils, task-lxde-desktop, epiphany-browser, ca-certificates,
-        apt-utils, systemd-timesyncd
+        kmod, systemd-sysv, netbase, ca-certificates, locales,
+        iproute2, iw, wpasupplicant, connman,
+        fdisk, dosfstools,
+        fbi, polkitd, udisks2, gvfs,
+        python3-aiohttp, python3-passlib, python3-pyudev, python3-pydbus,
+        weston, chromium,
+        adduser, systemd-timesyncd
     ]
 
   - action: run
@@ -47,7 +47,7 @@ actions:
   - action: run
     description: add a new user (will be in sudoers)
     chroot: true
-    script: scripts/setup-user.sh {{ $user }} "{{ $pass }}"
+    script: scripts/setup-user.sh {{ $user }} "{{ $pass }}" -n
 
   - action: run
     description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
@@ -55,13 +55,10 @@ actions:
     command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
 
   - action: run
-    description: set auto login & disable screen powersave
+    description: Add reboot and poweroff aliases to {{ $user }}
     chroot: true
-    script: scripts/setup-login.sh {{ $user }}
-
-  - action: overlay
-    description: command for extending rootfs partition
-    source: overlays/growfs
+    command: |
+      echo "alias reboot='systemctl reboot'\nalias poweroff='systemctl poweroff'" >> /home/{{ $user }}/.bashrc
 
   - action: overlay
     description: command for fixing serial console terminal size
@@ -96,9 +93,24 @@ actions:
     source: overlays/boards/{{ $board }}
 
   - action: run
-    description: NM connections must be readable by root only
+    description: set ownership of the WEBPANEL APP files
     chroot: true
-    command: find /etc/NetworkManager/system-connections/ -type f -exec chmod 600 {} \+
+    command: chown -R {{ $user }}:{{ $user }} /home/{{ $user }}
+
+  - action: run
+    description: set weston to autostart on boot
+    chroot: true
+    script: scripts/setup-weston.sh {{ $user }}
+    
+  - action: run
+    description: set WEBPANEL app to autostart on boot
+    chroot: true
+    script: scripts/setup-webpanel.sh CH
+
+  - action: run
+    description: set WiFi regulatory DB
+    chroot: true
+    script: scripts/setup-wifi.sh yocto
 
   - action: image-partition
     description: create a partitioned image
@@ -138,5 +150,10 @@ actions:
   - action: run
     description: compress the image
     postprocess: true
-    command: xz -T0 -f {{ $image }}
+    command: xz -T0 -f -k {{ $image }}
+    
+  - action: run
+    description: compress image as gz
+    postprocess: true
+    command: pigz -f -k {{ $image }}
 {{end}}

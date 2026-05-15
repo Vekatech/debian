@@ -5,6 +5,10 @@ if [ -z "$locale" ]; then
   locale=en_US
 fi
 
-echo "${locale}.UTF-8 UTF-8" > /etc/locale.gen
+cat > /etc/locale.gen <<EOF
+en_US.UTF-8 UTF-8
+en_GB.UTF-8 UTF-8
+EOF
+
 locale-gen
 update-locale LANG=${locale}.UTF-8

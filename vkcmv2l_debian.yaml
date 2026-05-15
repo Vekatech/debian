@@ -1,10 +1,10 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
 {{- $suite    := or .suite    "trixie" -}}
-{{- $board    := or .board    "vkrzg2ul" -}}
+{{- $board    := or .board    "vkcmv2l" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
-{{- $pass     := or .pass     "vkrzg2ul" -}}
+{{- $pass     := or .pass     "vkcmv2l" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
 {{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
@@ -29,8 +29,8 @@ actions:
         iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
-        fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils,
+        fdisk, network-manager, dosfstools, alsaplayer-common, alsa-utils,
+        v4l-utils, task-lxde-desktop, chromium, ca-certificates,
         apt-utils, systemd-timesyncd
     ]
 
@@ -53,6 +53,11 @@ actions:
     description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
     chroot: true
     command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
+
+  - action: run
+    description: set auto login & disable screen powersave
+    chroot: true
+    script: scripts/setup-login.sh {{ $user }}
 
   - action: overlay
     description: command for extending rootfs partition

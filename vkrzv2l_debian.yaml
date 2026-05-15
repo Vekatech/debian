@@ -1,6 +1,6 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
-{{- $suite    := or .suite    "bookworm" -}}
+{{- $suite    := or .suite    "trixie" -}}
 {{- $board    := or .board    "vkrzv2l" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
@@ -138,5 +138,5 @@ actions:
   - action: run
     description: compress the image
     postprocess: true
-    command: xz -T0 -f {{ $image }}
+    command: xz -T0 -f -k {{ $image }}
 {{end}}

@@ -1,14 +1,14 @@
 {{- $stage    := or .stage    "full" -}}
 {{- $arch     := or .arch     "arm64" -}}
-{{- $suite    := or .suite    "bookworm" -}}
-{{- $board    := or .board    "vkrzg2lc" -}}
+{{- $suite    := or .suite    "trixie" -}}
+{{- $board    := or .board    "vk-d184280e-kd070" -}}
 {{- $locale   := or .locale   "en_US" -}}
 {{- $user     := or .user     "vkrz" -}}
 {{- $pass     := or .pass     "vkrzg2lc" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
-{{- $image    := or .image    (printf "debian-%s-%s-pf.img" $suite $board) -}}
-{{- $sparse_image :=          (printf "debian-%s-%s-pf.simg" $suite $board) -}}
+{{- $image    := or .image    (printf "debian-%s-%s.img" $suite $board) -}}
+{{- $sparse_image :=          (printf "debian-%s-%s.simg" $suite $board) -}}
 
 architecture: {{ $arch }}
 
@@ -29,8 +29,9 @@ actions:
         iputils-ping, udhcpc, netbase, net-tools, ethtool, openssh-server,
         lsb-release, locales, dialog, file, usbutils, nano, less, tree,
         vim-tiny, screen, rsync, curl, wget, zip, unzip, cloud-guest-utils,
-        fdisk, network-manager, modemmanager, dosfstools, alsaplayer-common, alsa-utils,
-        v4l-utils, task-lxde-desktop, ca-certificates,
+        fdisk, dosfstools, iw, wpasupplicant, connman-gtk,
+        alsaplayer-common, alsa-utils,
+        v4l-utils, task-lxde-desktop, chromium, ca-certificates,
         apt-utils, systemd-timesyncd
     ]
 
@@ -50,14 +51,9 @@ actions:
     script: scripts/setup-user.sh {{ $user }} "{{ $pass }}"
 
   - action: run
-    description: add a user to group video, audio, dialout, tty, disk, kmem, kvm, render
+    description: add a user to group video, audio, dialout, tty, disk, kmem, kvm
     chroot: true
-    command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm,render {{ $user }}
-
-  - action: run
-    description: setup Renderer
-    chroot: true
-    command: echo 'PAN_MESA_DEBUG="noafbc"' > /etc/environment
+    command: usermod -aG video,audio,dialout,tty,disk,kmem,kvm {{ $user }}
 
   - action: run
     description: set auto login & disable screen powersave
@@ -101,9 +97,14 @@ actions:
     source: overlays/boards/{{ $board }}
 
   - action: run
-    description: NM connections must be readable by root only
+    description: set WiFi regulatory DB
     chroot: true
-    command: find /etc/NetworkManager/system-connections/ -type f -exec chmod 600 {} \+
+    script: scripts/setup-wifi.sh yocto
+
+#  - action: run
+#    description: NM connections must be readable by root only
+#    chroot: true
+#    command: find /etc/NetworkManager/system-connections/ -type f -exec chmod 600 {} \+
 
   - action: image-partition
     description: create a partitioned image
@@ -143,5 +144,5 @@ actions:
   - action: run
     description: compress the image
     postprocess: true
-    command: xz -T0 -f {{ $image }}
+    command: xz -T0 -f -k {{ $image }}
 {{end}}

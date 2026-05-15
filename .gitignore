@@ -1,3 +1,8 @@
 kernel/
+webpanel/
 overlays/boards/*/boot/
-overlays/boards/*/lib/
+overlays/boards/*/lib/modules
+overlays/boards/*/lib/firmware
+debian-*.xz
+debian-*.bmap
+debian-*.simg

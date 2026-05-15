@@ -10,13 +10,22 @@ if [ -z "$PASS" ]; then
   PASS=$USER
 fi
 
+SUDO=$3
+if [ "$SUDO" = "-n" ]; then
+  SUDO="-n"
+else
+  SUDO="-y"
+fi
+
 adduser \
   --gecos "$USER" \
   --disabled-password \
   --shell /bin/bash \
   "$USER"
 
-adduser "$USER" sudo
 echo "$USER:$PASS" | chpasswd
 
-echo "$USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USER
+if [ -d /etc/sudoers.d ] && [ "$SUDO" = "-y" ]; then
+  adduser "$USER" sudo
+  echo "$USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USER
+fi

@@ -12,29 +12,44 @@ if [ $# -ne 1 ]; then
     echo "Usage: $0 <RECIPE.yaml>"
     exit 1
 else
-    BRD=${1%%_*} 
+    BRD=${1%_*} 
     echo -e "\nBuilding ${M}Debian${E} for ${G}${BRD}${E} board\n"
 fi
 
 case "${BRD}" in
-    "vkrzv2l")
+    "vkrzv2l" | "vkcmv2l")
         FML="v2l"
     ;;
-    "vkrzg2l" | "vkrzg2lc" | "vkrzg2ul" | "vkcmg2lc" | "vk-d184280e")
+    "vkrzg2l" | "vkrzg2lc" | "vkrzg2ul" | "vkcmg2l" | "vkcmg2lc" | "vk-d184280e" | "vk-d184280e-kd070" | "vk-d184280e-kd070_1" | "vk-d184280e-kd101")
         FML="g2l"
     ;;
     *)
         echo -e "Unsupported <${R}BOARD${E}>_debian.yaml: ${R}$1${E}"
-        echo -e "Available BOARDs are: ${G}vkrzv2l${E} | ${G}vkrzg2l${E} | ${G}vkrzg2lc${E} | ${G}vkrzg2ul${E} | ${G}vkcmg2lc${E} | ${G}vk-d184280e${E}"
+        echo -e "Available BOARDs are: ${G}vkrzv2l${E} | ${G}vkrzg2l${E} | ${G}vkrzg2lc${E} | ${G}vkrzg2ul${E} | | ${G}vkcmv2l${E} | ${G}vkcmg2l${E} | ${G}vkcmg2lc${E} | ${G}vk-d184280e${E} | ${G}vk-d184280e-kd070${E} | ${G}vk-d184280e-kd070_1${E} | ${G}vk-d184280e-kd101${E}"
         exit 1 
     ;;
 esac
 
 KERNEL_PATH=$(dirname $(realpath $0))/kernel
 CACHE_PATH=$(dirname $(realpath $0))/overlays/boards
-YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
+#YOCTO_PATH=
+YOCTO_PATH=
+#YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
+#YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto-kiosk/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
 
+APP_PATH=$(dirname $(realpath $0))/webpanel
+SIGN_PATH=/home/${USER}/Documents/LV/src/flasher/image
 KERNEL=
+
+cleanup_mount() {
+    sudo umount "${SRC}/mnt" 2>/dev/null || true
+
+    if [ -n "${DEV:-}" ]; then
+        sudo losetup -d "${DEV}" 2>/dev/null || true
+    fi
+}
+
+trap cleanup_mount EXIT
 
 echo -e "Checking for ${Y}kernel${E} img ..."
 if [ -d ${CACHE_PATH}/${BRD} ]; then
@@ -107,7 +122,7 @@ if [ -z "${KERNEL}" ]; then
         "vkcmg2lc")
         KIT=VK-CMG2LC_docs
         ;;
-        "vk-d184280e")
+        "vk-d184280e"| "vk-d184280e-kd070" | "vk-d184280e-kd070_1" | "vk-d184280e-kd101")
         KIT=VK-D184280E_docs
         ;;
         *)
@@ -163,12 +178,48 @@ else
         mkdir -p ${CACHE_PATH}/${BRD}/boot
         echo -e "  Extracting ${G}boot${E} partition ..."
         cp -a /mnt/* ${CACHE_PATH}/${BRD}/boot/
+        case "${BRD}" in
+            "vk-d184280e")
+                echo -e "    Startup screen ${G}log${E} ... Disabled"
+                if grep -q '^extrabootargs=' ${CACHE_PATH}/${BRD}/boot/uEnv.txt; then
+                    sed -i '/^extrabootargs=/s|loglevel=3||' ${CACHE_PATH}/${BRD}/boot/uEnv.txt
+                    sed -i 's|^extrabootargs=\(.*\)$|extrabootargs=loglevel=3 \1|' ${CACHE_PATH}/${BRD}/boot/uEnv.txt
+                else
+                    sed -i '/^#extrabootargs=.*$/a \extrabootargs=loglevel=3' ${CACHE_PATH}/${BRD}/boot/uEnv.txt
+                fi
+            ;;
+            *)
+                echo -e "    Startup screen ${G}log${E} ... Normal"
+            ;;
+        esac
         sudo umount /mnt
         sudo mount ${DEV}p2 /mnt
+        
         mkdir -p ${CACHE_PATH}/${BRD}/lib
         echo -e "  Extracting ${G}modules${E} ..."
         cp -a /mnt/lib/modules ${CACHE_PATH}/${BRD}/lib/
-        if [ "$1" = "vkrzg2lc_debian_wl.yaml" ]; then
+        case "${BRD}" in
+            "vk-d184280e" | "vk-d184280e-kd070" | "vk-d184280e-kd070_1" | "vk-d184280e-kd101")
+                mkdir -p ${CACHE_PATH}/${BRD}/lib/firmware
+                echo -e "  Extracting ${G}firmware${E} ..."
+                if [ -f /mnt/lib/firmware/regulatory.db ]; then
+                    cp -a /mnt/lib/firmware/regulatory.db ${CACHE_PATH}/${BRD}/lib/firmware/regulatory.db-yocto
+                fi
+                if [ -f /mnt/lib/firmware/regulatory.db.p7s ]; then
+                    cp -a /mnt/lib/firmware/regulatory.db.p7s ${CACHE_PATH}/${BRD}/lib/firmware/regulatory.db.p7s-yocto
+                fi
+                if [ -d /mnt/lib/firmware/brcm ]; then
+                    cp -a /mnt/lib/firmware/brcm ${CACHE_PATH}/${BRD}/lib/firmware/
+                fi
+                if [ -d /mnt/lib/firmware/cypress ]; then
+                    cp -a /mnt/lib/firmware/cypress ${CACHE_PATH}/${BRD}/lib/firmware/
+                fi
+            ;;
+            *)
+                echo -e "  Extracting ${G}firmware${E} ... <${R}No firmware${E} for this board"
+            ;;
+        esac
+        if [ "${BRD}" = "vk-d184280e" ] || [ "$1" = "vkrzg2lc_debian-wl.yaml" ]; then
             echo -e "  Extracting ${G}mali${E} driver ..."
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/include
             if [ -d /mnt/usr/include/CL ]; then
@@ -189,33 +240,43 @@ else
             if [ -d /mnt/usr/include/GLES3 ]; then
                 cp -a /mnt/usr/include/GLES3 ${CACHE_PATH}/${BRD}/usr/local/include/
             fi
-            mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib
+            LIBDIR=usr/local/lib/mali-G31
+            mkdir -p ${CACHE_PATH}/${BRD}/${LIBDIR}
             if [ -f /mnt/usr/lib64/libEGL.so ]; then
-                cp -a /mnt/usr/lib64/libEGL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libEGL.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libEGL.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libEGL.so.1
             fi
             if [ -f /mnt/usr/lib64/libgbm.so ]; then
-                cp -a /mnt/usr/lib64/libgbm.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libgbm.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libgbm.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libgbm.so.1
             fi
             if [ -f /mnt/usr/lib64/libGLESv1_CM.so ]; then
-                cp -a /mnt/usr/lib64/libGLESv1_CM.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libGLESv1_CM.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libGLESv1_CM.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libGLESv1_CM.so.1
             fi
             if [ -f /mnt/usr/lib64/libGLESv2.so ]; then
-                cp -a /mnt/usr/lib64/libGLESv2.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libGLESv2.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libGLESv2.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libGLESv2.so.2
             fi
             if [ -f /mnt/usr/lib64/libOpenCL.so ]; then
-                cp -a /mnt/usr/lib64/libOpenCL.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libOpenCL.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libOpenCL.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libOpenCL.so.2
             fi
             if [ -f /mnt/usr/lib64/libwayland-egl.so ]; then
-                cp -a /mnt/usr/lib64/libwayland-egl.so ${CACHE_PATH}/${BRD}/usr/local/lib/
+                cp -a /mnt/usr/lib64/libwayland-egl.so ${CACHE_PATH}/${BRD}/${LIBDIR}/
+                ln -s libwayland-egl.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libwayland-egl.so.1
             fi
-            mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/mali_fbdev
-            if [ -f /mnt/usr/lib64/mali_fbdev/libmali.so ]; then
-                cp -a /mnt/usr/lib64/mali_fbdev/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_fbdev/
+            if [ -d /mnt/usr/lib64/mali_fbdev ]; then
+                cp -a /mnt/usr/lib64/mali_fbdev ${CACHE_PATH}/${BRD}/${LIBDIR}/
             fi
-            mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/mali_wayland
+            if [ -d /mnt/usr/lib64/mali_wayland ]; then
+                cp -a /mnt/usr/lib64/mali_wayland ${CACHE_PATH}/${BRD}/${LIBDIR}/
+            fi
+            
             if [ -f /mnt/usr/lib64/mali_wayland/libmali.so ]; then
-                cp -a /mnt/usr/lib64/mali_wayland/libmali.so ${CACHE_PATH}/${BRD}/usr/local/lib/mali_wayland/
+                ln -s mali_wayland/libmali.so ${CACHE_PATH}/${BRD}/${LIBDIR}/libmali.so
             fi
+            
             mkdir -p ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig
             if [ -f /mnt/usr/lib64/pkgconfig/egl.pc ]; then
                 cp -a /mnt/usr/lib64/pkgconfig/egl.pc ${CACHE_PATH}/${BRD}/usr/local/lib/pkgconfig/
@@ -240,16 +301,56 @@ else
             fi
             echo -e "  Configuring ${G}weston${E} ..."
             mkdir -p ${CACHE_PATH}/${BRD}/etc/default
-            echo 'OPTARGS="--idle-time=0"' > ${CACHE_PATH}/${BRD}/etc/default/weston
-            mkdir -p ${CACHE_PATH}/${BRD}/etc/xdg/weston
-            cp -a /mnt/etc/xdg/weston/weston.ini ${CACHE_PATH}/${BRD}/etc/xdg/weston/
-            sed -i '/weston-terminal$/,${/^\[launcher\]$/{N;N;N;d}}' ${CACHE_PATH}/${BRD}/etc/xdg/weston/weston.ini
+            cp -a /mnt/etc/default/weston ${CACHE_PATH}/${BRD}/etc/default/
+            if ! grep -q '^OPTARGS' "${CACHE_PATH}/${BRD}/etc/default/weston"; then
+                echo 'OPTARGS=""' >> ${CACHE_PATH}/${BRD}/etc/default/weston
+            fi
+            sed -i '/^OPTARGS=/s|"\(.*\)"|"--backend=drm --renderer=gl \1"|' ${CACHE_PATH}/${BRD}/etc/default/weston
+            mkdir -p ${CACHE_PATH}/${BRD}/etc/xdg
+            cp -a /mnt/etc/xdg/weston ${CACHE_PATH}/${BRD}/etc/xdg/
+            sed -i '/^\[output\]$/,${s|^name=.*$|name=DSI-1|;s|^mode=.*$|mode=preferred\n#transform=rotate-xx\n|}' ${CACHE_PATH}/${BRD}/etc/xdg/weston/weston.ini
             mkdir -p ${CACHE_PATH}/${BRD}/lib/systemd/system
-            cp -a /mnt/lib/systemd/system/weston@.service ${CACHE_PATH}/${BRD}/lib/systemd/system/
-            sed -i 's|^ExecStart=.*$|TTYPath=/dev/tty1\nExecStartPre=/bin/sh -c '\''if [ ! -f /var/log/weston.log ]; then install -m 664 -o root -g %i /dev/null /var/log/weston.log; fi'\''\nExecStartPre=/bin/sh -c '\''if [ -f /usr/local/lib/force_mali.sh ]; then /usr/local/lib/force_mali.sh; fi'\''\nExecStart=/usr/bin/weston $OPTARGS --log=/var/log/weston.log\n\n[Install]\nWantedBy=multi-user.target|' ${CACHE_PATH}/${BRD}/lib/systemd/system/weston@.service
+            #cp -a /mnt/lib/systemd/system/weston\@.service ${CACHE_PATH}/${BRD}/lib/systemd/system/
+            cat > "${CACHE_PATH}/${BRD}/lib/systemd/system/weston@.service" <<EOF
+[Unit]
+Description=Weston Wayland Compositor
+RequiresMountsFor=/run
+Conflicts=plymouth-quit.service
+After=systemd-user-sessions.service plymouth-quit-wait.service dbus.service multi-user.target
+
+[Service]
+User=%i
+PAMName=login
+EnvironmentFile=-/etc/default/weston
+StandardError=journal
+PermissionsStartOnly=true
+IgnoreSIGPIPE=no
+
+Environment=LD_LIBRARY_PATH=/${LIBDIR}
+TTYPath=/dev/tty1
+ExecStartPre=/bin/sh -c 'if [ ! -f /var/log/weston.log ]; then install -m 664 -o root -g %i /dev/null /var/log/weston.log; fi'
+ExecStart=/usr/bin/weston \$OPTARGS --log=/var/log/weston.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
         fi
         sudo umount /mnt
         sudo losetup -d ${DEV}
+    fi
+    if [ "${BRD}" = "vk-d184280e" ]; then
+        if [ -d "${APP_PATH}" ]; then
+            echo -e "Copping WEBPANEL ${G}APP${E} data ..."
+            find "${APP_PATH}" -type d -exec chmod 755 {} +
+            cp -a "${APP_PATH}/." "${CACHE_PATH}/${BRD}/"
+            find "${CACHE_PATH}/${BRD}/home/vkrz/.config/scripts" -type f -name "*.c" -delete
+            find "${CACHE_PATH}/${BRD}/home/vkrz/.config/scripts" -type f -name "Makefile" -delete
+            echo -e "  Configuring WEBPANEL ${G}APP${E} launch scripts ..."
+            find "${CACHE_PATH}/${BRD}/home/vkrz/.config/scripts" -type f -name "*.sh" -exec chmod +x {} \;
+            find "${CACHE_PATH}/${BRD}/home/vkrz/.config/scripts" -type f -name "*.so" -exec chmod +x {} \;
+        else
+            echo -e "Copping ${G}WEBPANEL${E} data ... No ${R}$(basename "${APP_PATH}")${E} folder"
+        fi
     fi
 
     if ! command -v docker &> /dev/null; then
@@ -280,5 +381,24 @@ else
     fi
 
     echo -e "\nBuilding ...\n"
-    docker run --rm --interactive --tty --device /dev/kvm --group-add $(getent group kvm | cut -d: -f3) --user $(id -u) --workdir /recipes --mount "type=bind,source=$(pwd),destination=/recipes" --security-opt label=disable godebos/debos $1
+    docker run --rm --interactive --tty --device /dev/kvm --group-add $(getent group kvm | cut -d: -f3) --user $(id -u) --workdir /recipes --mount "type=bind,source=$(pwd),destination=/recipes" --security-opt label=disable godebos/debos --memory 4G --scratchsize 8G $1
+    VER=$(sed -n 's/.*\.suite[[:space:]]*"\([^"]*\)".*/\1/p' "$1")
+    if [ -f debian-${VER}-${BRD}.img ]; then
+        echo -e "\nGenerating sparsed img ..."
+        img2simg debian-${VER}-${BRD}.img debian-${VER}-${BRD}.simg
+        if [ "${BRD}" = "vk-d184280e" ] && [ -d "${SIGN_PATH}" ]; then
+            echo -e "\nSigning img ..."
+            mv debian-${VER}-${BRD}.img ${SIGN_PATH}/img/
+            if [ -f "debian-${VER}-${BRD}.img.gz" ]; then
+                mv debian-${VER}-${BRD}.img.gz ${SIGN_PATH}/img/
+                ${SIGN_PATH}/gen_manifest.sh
+            fi
+        else
+            rm debian-${VER}-${BRD}.img
+        fi
+    fi
+    #    xz -dc debian-${VER}-${BRD}.img.xz > /tmp/debian-${VER}-${BRD}.img
+    #    img2simg /tmp/debian-${VER}-${BRD}.img debian-${VER}-${BRD}.simg
+    #    rm /tmp/debian-${VER}-${BRD}.img
+    echo -e "\nDone\n"
 fi
