@@ -30,19 +30,20 @@ case "${BRD}" in
     ;;
 esac
 
-KERNEL_PATH=$(dirname $(realpath $0))/kernel
-CACHE_PATH=$(dirname $(realpath $0))/overlays/boards
+SRC=$(dirname $(realpath $0))
+KERNEL_PATH=${SRC}/kernel
+CACHE_PATH=${SRC}/overlays/boards
 #YOCTO_PATH=
 YOCTO_PATH=
-#YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
-#YOCTO_PATH=$(dirname $(realpath $0))/../yocto/vlp_v3.0.6/yocto-kiosk/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
+#YOCTO_PATH=${SRC}/../yocto/vlp_v3.0.6/yocto/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
+#YOCTO_PATH=${SRC}/../yocto/vlp_v3.0.6/yocto-kiosk/v3.0.6-${FML:0:1}2l/${BRD}/tmp/deploy/images
 
-APP_PATH=$(dirname $(realpath $0))/webpanel
+APP_PATH=${SRC}/webpanel
 SIGN_PATH=/home/${USER}/Documents/LV/src/flasher/image
 KERNEL=
 
 cleanup_mount() {
-    sudo umount "${SRC}/mnt" 2>/dev/null || true
+    sudo umount "/mnt" 2>/dev/null || true
 
     if [ -n "${DEV:-}" ]; then
         sudo losetup -d "${DEV}" 2>/dev/null || true
@@ -381,24 +382,29 @@ EOF
     fi
 
     echo -e "\nBuilding ...\n"
-    docker run --rm --interactive --tty --device /dev/kvm --group-add $(getent group kvm | cut -d: -f3) --user $(id -u) --workdir /recipes --mount "type=bind,source=$(pwd),destination=/recipes" --security-opt label=disable godebos/debos --memory 4G --scratchsize 8G $1
+    
+    if [ ! -d "${SRC}/images/${BRD}" ]; then
+        mkdir -p "${SRC}/images/${BRD}"
+    fi
+    
+    docker run --rm --interactive --tty --device /dev/kvm --group-add $(getent group kvm | cut -d: -f3) --user $(id -u) --workdir /recipes --mount "type=bind,source=${SRC},destination=/recipes" --security-opt label=disable godebos/debos --memory 4G --scratchsize 8G $1
     VER=$(sed -n 's/.*\.suite[[:space:]]*"\([^"]*\)".*/\1/p' "$1")
-    if [ -f debian-${VER}-${BRD}.img ]; then
+    if [ -f "${SRC}/images/${BRD}/debian-${VER}-${BRD}.img" ]; then
         echo -e "\nGenerating sparsed img ..."
-        img2simg debian-${VER}-${BRD}.img debian-${VER}-${BRD}.simg
+        img2simg ${SRC}/images/${BRD}/debian-${VER}-${BRD}.img ${SRC}/images/${BRD}/debian-${VER}-${BRD}.simg
         if [ "${BRD}" = "vk-d184280e" ] && [ -d "${SIGN_PATH}" ]; then
             echo -e "\nSigning img ..."
-            mv debian-${VER}-${BRD}.img ${SIGN_PATH}/img/
-            if [ -f "debian-${VER}-${BRD}.img.gz" ]; then
-                mv debian-${VER}-${BRD}.img.gz ${SIGN_PATH}/img/
+            mv ${SRC}/images/${BRD}/debian-${VER}-${BRD}.img ${SIGN_PATH}/img/
+            if [ -f "${SRC}/images/${BRD}/debian-${VER}-${BRD}.img.gz" ]; then
+                mv ${SRC}/images/${BRD}/debian-${VER}-${BRD}.img.gz ${SIGN_PATH}/img/
                 ${SIGN_PATH}/gen_manifest.sh
             fi
         else
-            rm debian-${VER}-${BRD}.img
+            rm ${SRC}/images/${BRD}/debian-${VER}-${BRD}.img
         fi
     fi
-    #    xz -dc debian-${VER}-${BRD}.img.xz > /tmp/debian-${VER}-${BRD}.img
-    #    img2simg /tmp/debian-${VER}-${BRD}.img debian-${VER}-${BRD}.simg
+    #    xz -dc ${SRC}/images/${BRD}/debian-${VER}-${BRD}.img.xz > /tmp/debian-${VER}-${BRD}.img
+    #    img2simg /tmp/debian-${VER}-${BRD}.img ${SRC}/images/${BRD}/debian-${VER}-${BRD}.simg
     #    rm /tmp/debian-${VER}-${BRD}.img
     echo -e "\nDone\n"
 fi

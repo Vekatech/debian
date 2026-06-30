@@ -6,8 +6,9 @@
 {{- $user     := or .user     "vkrz" -}}
 {{- $pass     := or .pass     "vkrzg2lc" -}}
 {{- $hostname := or .hostname (printf "%s" $board) -}}
+{{- $outdir   := or .outdir   (printf "images/%s" $board) -}}
 {{- $pack     := or .pack     (printf "debian-%s-%s.tgz" $suite $arch) -}}
-{{- $image    := or .image    (printf "debian-%s-%s-pf.img" $suite $board) -}}
+{{- $image    := or .image    (printf "%s/debian-%s-%s-pf.img" $outdir $suite $board) -}}
 {{- $sparse_image :=          (printf "debian-%s-%s-pf.simg" $suite $board) -}}
 
 architecture: {{ $arch }}
